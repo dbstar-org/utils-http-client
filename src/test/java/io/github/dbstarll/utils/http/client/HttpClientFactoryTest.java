@@ -27,11 +27,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
  */
 public class HttpClientFactoryTest {
     @Test
-    void New() {
-        new HttpClientFactory();
-    }
-
-    @Test
     void build() throws IOException {
         final HttpClientFactory factory = new HttpClientFactory();
         final CloseableHttpClient client = factory.build();
@@ -41,31 +36,25 @@ public class HttpClientFactoryTest {
 
     @Test
     void context() throws Exception {
-        final KeyStore keyStore = loadKeyStore("/cacerts", "changeit".toCharArray());
+        final KeyStore keyStore = loadKeyStore();
         final SSLContext context = SSLContextBuilder.create().loadTrustMaterial(keyStore, new TrustAllStrategy()).build();
 
         final HttpClientFactory factory = new HttpClientFactory();
         factory.setSslContext(context);
 
-        final CloseableHttpClient client = factory.build();
-        try {
+        try (CloseableHttpClient client = factory.build()) {
             final HttpUriRequest request = RequestBuilder.get("https://static.y1cloud.com/ping.html").build();
 
-            final CloseableHttpResponse response = client.execute(request);
-            try {
+            try (CloseableHttpResponse response = client.execute(request)) {
                 final String res = EntityUtils.toString(response.getEntity());
                 assertEquals("ok\n", res);
-            } finally {
-                response.close();
             }
-        } finally {
-            client.close();
         }
     }
 
     @Test
     void proxy() throws Exception {
-        final KeyStore keyStore = loadKeyStore("/cacerts", "changeit".toCharArray());
+        final KeyStore keyStore = loadKeyStore();
         final SSLContext context = SSLContextBuilder.create().loadTrustMaterial(keyStore, new TrustAllStrategy()).build();
 
         final HttpClientFactory factory = new HttpClientFactory();
@@ -73,30 +62,21 @@ public class HttpClientFactoryTest {
         factory.setProxy(new Proxy(Proxy.Type.SOCKS, new InetSocketAddress("y1cloud.com", 1080)));
         factory.setResolveFromProxy(true);
 
-        final CloseableHttpClient client = factory.build();
-        try {
+        try (CloseableHttpClient client = factory.build()) {
             final HttpUriRequest request = RequestBuilder.get("https://static.y1cloud.com/ping.html").build();
 
-            final CloseableHttpResponse response = client.execute(request);
-            try {
+            try (CloseableHttpResponse response = client.execute(request)) {
                 final String res = EntityUtils.toString(response.getEntity());
                 assertEquals("ok\n", res);
-            } finally {
-                response.close();
             }
-        } finally {
-            client.close();
         }
     }
 
-    private KeyStore loadKeyStore(String resource, char[] password)
+    private KeyStore loadKeyStore()
             throws KeyStoreException, NoSuchAlgorithmException, CertificateException, IOException {
         final KeyStore keyStore = KeyStore.getInstance("JKS");
-        final InputStream in = getClass().getResourceAsStream(resource);
-        try {
-            keyStore.load(in, password);
-        } finally {
-            in.close();
+        try (InputStream in = getClass().getResourceAsStream("/cacerts")) {
+            keyStore.load(in, "changeit".toCharArray());
         }
         return keyStore;
     }
