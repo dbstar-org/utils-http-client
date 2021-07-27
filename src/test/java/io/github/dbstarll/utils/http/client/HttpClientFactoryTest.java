@@ -40,6 +40,7 @@ public class HttpClientFactoryTest {
         final SSLContext context = SSLContextBuilder.create().loadTrustMaterial(keyStore, new TrustAllStrategy()).build();
 
         final HttpClientFactory factory = new HttpClientFactory();
+        factory.setAutomaticRetries(true);
         factory.setSslContext(context);
 
         try (CloseableHttpClient client = factory.build()) {
@@ -58,6 +59,7 @@ public class HttpClientFactoryTest {
         final SSLContext context = SSLContextBuilder.create().loadTrustMaterial(keyStore, new TrustAllStrategy()).build();
 
         final HttpClientFactory factory = new HttpClientFactory();
+        factory.setAutomaticRetries(true);
         factory.setSslContext(context);
         factory.setProxy(new Proxy(Proxy.Type.SOCKS, new InetSocketAddress("y1cloud.com", 1080)));
         factory.setResolveFromProxy(true);

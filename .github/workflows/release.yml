@@ -79,4 +79,4 @@ jobs:
       - run: mv ${{ github.workspace }}/release.properties.bak ${{ github.workspace }}/release.properties
 
       - name: Perform Release to Ossrh
-        run: mvn -B -U release:perform -P release,distribution-ossrh -DskipTests
+        run: mvn -B -U release:perform -P release,distribution-ossrh
