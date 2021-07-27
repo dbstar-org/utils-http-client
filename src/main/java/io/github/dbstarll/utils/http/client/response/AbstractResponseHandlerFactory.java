@@ -1,0 +1,35 @@
+package io.github.dbstarll.utils.http.client.response;
+
+import static org.apache.commons.lang3.Validate.notNull;
+
+import org.apache.http.client.ResponseHandler;
+
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
+
+public abstract class AbstractResponseHandlerFactory implements ResponseHandlerFactory {
+  private final Map<Class<?>, ResponseHandler<?>> handlers;
+
+  public AbstractResponseHandlerFactory() {
+    this.handlers = new HashMap<Class<?>, ResponseHandler<?>>();
+  }
+
+  protected final <T> void addResponseHandler(final Class<T> responseClass,
+                                              ResponseHandler<? extends T> responseHandler) {
+    notNull(responseClass, "responseClass is null");
+    notNull(responseHandler, "responseHandler is null");
+    handlers.put(responseClass, responseHandler);
+  }
+
+  @SuppressWarnings("unchecked")
+  @Override
+  public final <T> ResponseHandler<T> getResponseHandler(Class<T> responseClass) {
+    return (ResponseHandler<T>) handlers.get(notNull(responseClass, "responseClass is null"));
+  }
+
+  @Override
+  public final Iterator<Class<?>> iterator() {
+    return handlers.keySet().iterator();
+  }
+}
