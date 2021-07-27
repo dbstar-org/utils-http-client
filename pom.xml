@@ -52,44 +52,6 @@
 
   <profiles>
     <profile>
-      <id>java-test</id>
-      <activation>
-        <file>
-          <exists>src/test/java</exists>
-        </file>
-      </activation>
-      <properties>
-        <version.junit>4.13.2</version.junit>
-        <version.surefire-junit47>3.0.0-M5</version.surefire-junit47>
-      </properties>
-      <dependencies>
-        <dependency>
-          <groupId>junit</groupId>
-          <artifactId>junit</artifactId>
-          <version>${version.junit}</version>
-          <scope>test</scope>
-        </dependency>
-      </dependencies>
-      <build>
-        <pluginManagement>
-          <plugins>
-            <plugin>
-              <groupId>org.apache.maven.plugins</groupId>
-              <artifactId>maven-surefire-plugin</artifactId>
-              <dependencies>
-                <dependency>
-                  <groupId>org.apache.maven.surefire</groupId>
-                  <artifactId>surefire-junit47</artifactId>
-                  <version>${version.surefire-junit47}</version>
-                </dependency>
-              </dependencies>
-            </plugin>
-          </plugins>
-        </pluginManagement>
-      </build>
-    </profile>
-
-    <profile>
       <id>site-local</id>
       <distributionManagement>
         <site>
