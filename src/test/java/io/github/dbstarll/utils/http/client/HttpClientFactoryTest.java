@@ -19,9 +19,7 @@ import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.net.Proxy;
 import java.security.GeneralSecurityException;
-import java.security.KeyManagementException;
 import java.security.KeyStore;
-import java.security.NoSuchAlgorithmException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -32,7 +30,7 @@ public class HttpClientFactoryTest {
     private MockWebServer server;
 
     @BeforeEach
-    void setUp() throws IOException, KeyManagementException, NoSuchAlgorithmException {
+    void setUp() throws IOException {
         server = new MockWebServer();
         server.enqueue(new MockResponse().setBody("ok"));
         server.start();
