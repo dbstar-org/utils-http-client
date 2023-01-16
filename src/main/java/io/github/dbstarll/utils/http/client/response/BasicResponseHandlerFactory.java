@@ -7,7 +7,6 @@ public class BasicResponseHandlerFactory extends AbstractResponseHandlerFactory 
      * 构造BasicResponseHandlerFactory.
      */
     public BasicResponseHandlerFactory() {
-        super();
         addResponseHandler(String.class, new BasicResponseHandler());
     }
 }

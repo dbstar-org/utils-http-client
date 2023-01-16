@@ -12,7 +12,7 @@ public abstract class AbstractResponseHandlerFactory implements ResponseHandlerF
   private final Map<Class<?>, ResponseHandler<?>> handlers;
 
   protected AbstractResponseHandlerFactory() {
-    this.handlers = new HashMap<Class<?>, ResponseHandler<?>>();
+    this.handlers = new HashMap<>();
   }
 
   protected final <T> void addResponseHandler(final Class<T> responseClass,

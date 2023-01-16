@@ -26,7 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 /**
  * 测试HttpClientFactory
  */
-public class HttpClientFactoryTest {
+class HttpClientFactoryTest {
     private MockWebServer server;
 
     @BeforeEach
