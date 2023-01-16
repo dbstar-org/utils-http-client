@@ -1,10 +1,11 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
     <groupId>io.github.dbstarll.parent</groupId>
     <artifactId>base</artifactId>
-    <version>1.2.0</version>
+    <version>1.2.9</version>
   </parent>
   <groupId>io.github.dbstarll.utils</groupId>
   <artifactId>utils-http-client</artifactId>
@@ -22,7 +23,8 @@
 
   <properties>
     <project.git.project>utils-http-client</project.git.project>
-    <version.httpcomponents>4.5.13</version.httpcomponents>
+    <!-- module version -->
+    <version.httpcomponents>4.5.14</version.httpcomponents>
   </properties>
 
   <dependencyManagement>
@@ -57,7 +59,7 @@
         </file>
       </activation>
       <properties>
-        <version.mockwebserver>4.9.1</version.mockwebserver>
+        <version.mockwebserver>4.10.0</version.mockwebserver>
       </properties>
       <dependencyManagement>
         <dependencies>
