@@ -1,5 +1,7 @@
 package io.github.dbstarll.utils.http.client.response;
 
+import java.util.Arrays;
+
 import static org.apache.commons.lang3.Validate.noNullElements;
 
 public class MultiResponseHandlerFactory extends AbstractResponseHandlerFactory {
@@ -13,11 +15,7 @@ public class MultiResponseHandlerFactory extends AbstractResponseHandlerFactory 
     }
 
     protected final void addResponseHandlerFactory(final ResponseHandlerFactory... factories) {
-        for (ResponseHandlerFactory factory : noNullElements(factories)) {
-            for (Class<?> responseClass : factory) {
-                addResponseHandler(responseClass, factory);
-            }
-        }
+        Arrays.stream(noNullElements(factories)).forEach(f -> f.forEach(c -> addResponseHandler(c, f)));
     }
 
     private <T> void addResponseHandler(final Class<T> responseClass, final ResponseHandlerFactory factory) {
