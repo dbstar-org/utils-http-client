@@ -70,6 +70,18 @@
           <scope>test</scope>
         </dependency>
         <dependency>
+          <groupId>io.github.dbstarll.utils</groupId>
+          <artifactId>utils-lang</artifactId>
+          <version>1.0.7</version>
+          <scope>test</scope>
+        </dependency>
+        <dependency>
+          <groupId>org.bouncycastle</groupId>
+          <artifactId>bcpkix-jdk18on</artifactId>
+          <version>1.71.1</version>
+          <scope>test</scope>
+        </dependency>
+        <dependency>
           <groupId>ch.qos.logback</groupId>
           <artifactId>logback-classic</artifactId>
           <version>${version.logback}</version>

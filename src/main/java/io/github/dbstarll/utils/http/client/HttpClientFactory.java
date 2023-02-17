@@ -12,8 +12,12 @@ import org.apache.http.ssl.SSLContexts;
 
 import javax.net.ssl.SSLContext;
 import java.io.IOException;
-import java.net.*;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.Proxy;
 import java.net.Proxy.Type;
+import java.net.Socket;
+import java.net.UnknownHostException;
 
 public final class HttpClientFactory {
     public static final int DEFAULT_TIMEOUT = 2000;
@@ -133,7 +137,7 @@ public final class HttpClientFactory {
         }
 
         @Override
-        public Socket createSocket(final HttpContext context) throws IOException {
+        public Socket createSocket(final HttpContext context) {
             return new Socket(proxy);
         }
 
