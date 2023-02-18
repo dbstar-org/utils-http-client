@@ -26,70 +26,84 @@ public final class HttpClientFactory {
     private boolean resolveFromProxy;
     private int socketTimeout = DEFAULT_TIMEOUT;
     private int connectTimeout = DEFAULT_TIMEOUT;
-    private boolean automaticRetries = false;
+    private boolean automaticRetries = true;
     private HttpRequestRetryHandler retryHandler;
 
     /**
      * Assigns {@link SSLContext} instance.
      *
-     * @param sslContext SSLContext instance
+     * @param newSslContext SSLContext instance
+     * @return this HttpClientFactory
      */
-    public void setSslContext(final SSLContext sslContext) {
-        this.sslContext = sslContext;
+    public HttpClientFactory setSslContext(final SSLContext newSslContext) {
+        this.sslContext = newSslContext;
+        return this;
     }
 
     /**
      * 设置proxy.
      *
-     * @param proxy proxy实例
+     * @param newProxy proxy实例
+     * @return this HttpClientFactory
      */
-    public void setProxy(final Proxy proxy) {
-        this.proxy = proxy;
+    public HttpClientFactory setProxy(final Proxy newProxy) {
+        this.proxy = newProxy;
+        return this;
     }
 
     /**
      * 设置是否通过proxy来解析域名.
      *
-     * @param resolveFromProxy 是否通过proxy来解析域名
+     * @param newResolveFromProxy 是否通过proxy来解析域名
+     * @return this HttpClientFactory
      */
-    public void setResolveFromProxy(final boolean resolveFromProxy) {
-        this.resolveFromProxy = resolveFromProxy;
+    public HttpClientFactory setResolveFromProxy(final boolean newResolveFromProxy) {
+        this.resolveFromProxy = newResolveFromProxy;
+        return this;
     }
 
     /**
      * 设置socket timeout(ms).
      *
-     * @param socketTimeout socket timeout
+     * @param newSocketTimeout socket timeout
+     * @return this HttpClientFactory
      */
-    public void setSocketTimeout(final int socketTimeout) {
-        this.socketTimeout = socketTimeout;
+    public HttpClientFactory setSocketTimeout(final int newSocketTimeout) {
+        this.socketTimeout = newSocketTimeout;
+        return this;
     }
 
     /**
      * 设置connect timeout(ms).
      *
-     * @param connectTimeout connect timeout
+     * @param newConnectTimeout connect timeout
+     * @return this HttpClientFactory
      */
-    public void setConnectTimeout(final int connectTimeout) {
-        this.connectTimeout = connectTimeout;
+    public HttpClientFactory setConnectTimeout(final int newConnectTimeout) {
+        this.connectTimeout = newConnectTimeout;
+        return this;
     }
 
     /**
      * 设置是否再请求失败时重试，默认为不重试.
      *
-     * @param automaticRetries 是否再请求失败时重试
+     * @param newAutomaticRetries 是否再请求失败时重试
+     * @return this HttpClientFactory
      */
-    public void setAutomaticRetries(final boolean automaticRetries) {
-        this.automaticRetries = automaticRetries;
+    public HttpClientFactory setAutomaticRetries(final boolean newAutomaticRetries) {
+        this.automaticRetries = newAutomaticRetries;
+        return this;
     }
 
     /**
      * 设置重试处理器，若不为null，则忽略automaticRetries配置.
      *
-     * @param retryHandler 重试处理器
+     * @param newRetryHandler 重试处理器
+     * @return this HttpClientFactory
      */
-    public void setRetryHandler(final HttpRequestRetryHandler retryHandler) {
-        this.retryHandler = retryHandler;
+    public HttpClientFactory setRetryHandler(final HttpRequestRetryHandler newRetryHandler) {
+        this.retryHandler = newRetryHandler;
+        return this;
     }
 
     /**

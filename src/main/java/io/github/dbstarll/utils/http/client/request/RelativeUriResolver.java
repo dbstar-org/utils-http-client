@@ -36,13 +36,10 @@ public class RelativeUriResolver implements UriResolver {
 
     private void verifyContext() throws IllegalArgumentException {
         final String path = uriBase.getRawPath();
-        if (StringUtils.startsWith(path, context)) {
-            if (path.length() == context.length() || path.charAt(context.length()) == '/') {
-                // match and return
-                return;
-            }
+        if (!StringUtils.startsWith(path, context)
+                || (path.length() > context.length() && path.charAt(context.length()) != '/')) {
+            throw new IllegalArgumentException(String.format("path of [%s] not start with [%s/]", uriBase, context));
         }
-        throw new IllegalArgumentException(String.format("path of [%s] not start with [%s/]", uriBase, context));
     }
 
     private static String normalizedBase(final String uriBase) throws IllegalArgumentException {

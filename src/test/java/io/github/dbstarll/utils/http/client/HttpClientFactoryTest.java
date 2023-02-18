@@ -9,6 +9,7 @@ import io.github.dbstarll.utils.lang.security.SignatureAlgorithm;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import org.apache.commons.lang3.time.DateUtils;
+import org.apache.http.client.HttpRequestRetryHandler;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.client.methods.RequestBuilder;
@@ -34,6 +35,7 @@ import java.math.BigInteger;
 import java.net.InetSocketAddress;
 import java.net.Proxy;
 import java.net.Proxy.Type;
+import java.net.SocketException;
 import java.security.KeyPair;
 import java.security.KeyStore;
 import java.security.NoSuchAlgorithmException;
@@ -43,6 +45,7 @@ import java.security.SecureRandom;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.Date;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -50,6 +53,7 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrowsExactly;
 
 /**
  * 测试HttpClientFactory
@@ -91,7 +95,7 @@ class HttpClientFactoryTest {
     @Test
     void http() throws Throwable {
         useServer(server -> {
-            try (CloseableHttpClient client = new HttpClientFactory().build()) {
+            try (CloseableHttpClient client = new HttpClientFactory().setAutomaticRetries(false).build()) {
                 final HttpUriRequest request = RequestBuilder.get(server.url("/ping.html").uri()).build();
                 try (CloseableHttpResponse response = client.execute(request)) {
                     assertEquals("ok", EntityUtils.toString(response.getEntity()));
@@ -115,12 +119,9 @@ class HttpClientFactoryTest {
         keyStore.setKeyEntry("localhost", keyPair.getPrivate(), password, new X509Certificate[]{crt});
 
         useServer(server -> {
-            final HttpClientFactory factory = new HttpClientFactory();
             final SSLContext sslContext = SSLContextBuilder.create().loadTrustMaterial(keyStore, null)
                     .setSecureRandom(random).build();
-            factory.setSslContext(sslContext);
-
-            try (CloseableHttpClient client = factory.build()) {
+            try (CloseableHttpClient client = new HttpClientFactory().setSslContext(sslContext).build()) {
                 final HttpUriRequest request = RequestBuilder.get(server.url("/ping.html").uri()).build();
                 try (CloseableHttpResponse response = client.execute(request)) {
                     assertEquals("ok", EntityUtils.toString(response.getEntity()));
@@ -135,17 +136,54 @@ class HttpClientFactoryTest {
 
     @Test
     void proxy() throws Throwable {
-        useServer(server -> {
-            final HttpClientFactory factory = new HttpClientFactory();
-            factory.setProxy(HttpClientFactory.proxy(Type.SOCKS, "y1cloud.com", 1080));
-
-            try (CloseableHttpClient client = factory.build()) {
-                final HttpUriRequest request = RequestBuilder.get(server.url("/ping.html").uri()).build();
-                try (CloseableHttpResponse response = client.execute(request)) {
-                    assertEquals("ok", EntityUtils.toString(response.getEntity()));
-                }
+        try (CloseableHttpClient client = new HttpClientFactory().setSocketTimeout(5000).setConnectTimeout(5000)
+                .setProxy(HttpClientFactory.proxy(Type.SOCKS, "146.56.178.210", 12337)).build()) {
+            final HttpUriRequest request = RequestBuilder.get("https://static.y1cloud.com/ping.html").build();
+            try (CloseableHttpResponse response = client.execute(request)) {
+                assertEquals("ok\n", EntityUtils.toString(response.getEntity()));
             }
-        });
+        }
+    }
+
+    @Test
+    void proxyDirect() throws Throwable {
+        try (CloseableHttpClient client = new HttpClientFactory()
+                .setProxy(HttpClientFactory.proxy(Type.DIRECT, "146.56.178.210", 12337)).build()) {
+            final HttpUriRequest request = RequestBuilder.get("https://static.y1cloud.com/ping.html").build();
+            try (CloseableHttpResponse response = client.execute(request)) {
+                assertEquals("ok\n", EntityUtils.toString(response.getEntity()));
+            }
+        }
+    }
+
+    @Test
+    void resolveFromProxy() throws Throwable {
+        try (CloseableHttpClient client = new HttpClientFactory().setSocketTimeout(5000).setConnectTimeout(5000)
+                .setProxy(HttpClientFactory.proxy(Type.SOCKS, "146.56.178.210", 12337))
+                .setResolveFromProxy(true).build()) {
+            final HttpUriRequest request = RequestBuilder.get("https://static.y1cloud.com/ping.html").build();
+            try (CloseableHttpResponse response = client.execute(request)) {
+                assertEquals("ok\n", EntityUtils.toString(response.getEntity()));
+            }
+        }
+    }
+
+    @Test
+    void retry() throws Throwable {
+        final AtomicInteger retry = new AtomicInteger();
+        final HttpRequestRetryHandler retryHandler = (exception, executionCount, context) -> {
+            retry.incrementAndGet();
+            return executionCount < 3;
+        };
+        try (CloseableHttpClient client = new HttpClientFactory()
+                .setRetryHandler(retryHandler)
+                .setProxy(HttpClientFactory.proxy(Type.SOCKS, "y1cloud.com", 1080))
+                .build()) {
+            final HttpUriRequest request = RequestBuilder.get("https://static.y1cloud.com/ping.html").build();
+            final Exception e = assertThrowsExactly(SocketException.class, () -> client.execute(request));
+            assertEquals("connect timed out", e.getMessage());
+            assertEquals(3, retry.get());
+        }
     }
 
     private static KeyPair genKeyPair(final SecureRandom random) throws InstanceException, NoSuchAlgorithmException {
