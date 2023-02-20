@@ -8,7 +8,7 @@
   </parent>
   <groupId>io.github.dbstarll.utils</groupId>
   <artifactId>utils-http-client</artifactId>
-  <version>1.0.4</version>
+  <version>1.0.5-SNAPSHOT</version>
 
   <description>utils for http client</description>
   <url>https://github.com/dbstar-org/utils-http-client</url>
@@ -17,7 +17,7 @@
     <connection>scm:git:${project.git.git.root}</connection>
     <developerConnection>scm:git:${project.git.web.root}</developerConnection>
     <url>${project.git.web.master}</url>
-    <tag>v1.0.4</tag>
+    <tag>HEAD</tag>
   </scm>
 
   <properties>
