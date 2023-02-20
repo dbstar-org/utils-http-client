@@ -12,104 +12,131 @@ import org.apache.http.ssl.SSLContexts;
 
 import javax.net.ssl.SSLContext;
 import java.io.IOException;
-import java.net.*;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.Proxy;
 import java.net.Proxy.Type;
+import java.net.Socket;
+import java.net.UnknownHostException;
+import java.util.Arrays;
+import java.util.function.Consumer;
 
 public final class HttpClientFactory {
     public static final int DEFAULT_TIMEOUT = 2000;
-    private SSLContext sslContext = SSLContexts.createDefault();
+    private SSLContext sslContext;
     private Proxy proxy;
     private boolean resolveFromProxy;
     private int socketTimeout = DEFAULT_TIMEOUT;
     private int connectTimeout = DEFAULT_TIMEOUT;
-    private boolean automaticRetries = false;
+    private boolean automaticRetries = true;
     private HttpRequestRetryHandler retryHandler;
 
     /**
      * Assigns {@link SSLContext} instance.
      *
-     * @param sslContext SSLContext instance
+     * @param newSslContext SSLContext instance
+     * @return this HttpClientFactory
      */
-    public void setSslContext(final SSLContext sslContext) {
-        this.sslContext = sslContext;
+    public HttpClientFactory setSslContext(final SSLContext newSslContext) {
+        this.sslContext = newSslContext;
+        return this;
     }
 
     /**
      * 设置proxy.
      *
-     * @param proxy proxy实例
+     * @param newProxy proxy实例
+     * @return this HttpClientFactory
      */
-    public void setProxy(final Proxy proxy) {
-        this.proxy = proxy;
+    public HttpClientFactory setProxy(final Proxy newProxy) {
+        this.proxy = newProxy;
+        return this;
     }
 
     /**
      * 设置是否通过proxy来解析域名.
      *
-     * @param resolveFromProxy 是否通过proxy来解析域名
+     * @param newResolveFromProxy 是否通过proxy来解析域名
+     * @return this HttpClientFactory
      */
-    public void setResolveFromProxy(final boolean resolveFromProxy) {
-        this.resolveFromProxy = resolveFromProxy;
+    public HttpClientFactory setResolveFromProxy(final boolean newResolveFromProxy) {
+        this.resolveFromProxy = newResolveFromProxy;
+        return this;
     }
 
     /**
      * 设置socket timeout(ms).
      *
-     * @param socketTimeout socket timeout
+     * @param newSocketTimeout socket timeout
+     * @return this HttpClientFactory
      */
-    public void setSocketTimeout(final int socketTimeout) {
-        this.socketTimeout = socketTimeout;
+    public HttpClientFactory setSocketTimeout(final int newSocketTimeout) {
+        this.socketTimeout = newSocketTimeout;
+        return this;
     }
 
     /**
      * 设置connect timeout(ms).
      *
-     * @param connectTimeout connect timeout
+     * @param newConnectTimeout connect timeout
+     * @return this HttpClientFactory
      */
-    public void setConnectTimeout(final int connectTimeout) {
-        this.connectTimeout = connectTimeout;
+    public HttpClientFactory setConnectTimeout(final int newConnectTimeout) {
+        this.connectTimeout = newConnectTimeout;
+        return this;
     }
 
     /**
      * 设置是否再请求失败时重试，默认为不重试.
      *
-     * @param automaticRetries 是否再请求失败时重试
+     * @param newAutomaticRetries 是否再请求失败时重试
+     * @return this HttpClientFactory
      */
-    public void setAutomaticRetries(final boolean automaticRetries) {
-        this.automaticRetries = automaticRetries;
+    public HttpClientFactory setAutomaticRetries(final boolean newAutomaticRetries) {
+        this.automaticRetries = newAutomaticRetries;
+        return this;
     }
 
     /**
      * 设置重试处理器，若不为null，则忽略automaticRetries配置.
      *
-     * @param retryHandler 重试处理器
+     * @param newRetryHandler 重试处理器
+     * @return this HttpClientFactory
      */
-    public void setRetryHandler(final HttpRequestRetryHandler retryHandler) {
-        this.retryHandler = retryHandler;
+    public HttpClientFactory setRetryHandler(final HttpRequestRetryHandler newRetryHandler) {
+        this.retryHandler = newRetryHandler;
+        return this;
     }
 
     /**
      * 构造CloseableHttpClient.
      *
+     * @param consumers 用于对HttpClientBuilder的自定义
      * @return CloseableHttpClient
      */
-    public CloseableHttpClient build() {
+    @SafeVarargs
+    public final CloseableHttpClient build(final Consumer<HttpClientBuilder>... consumers) {
         final HttpClientBuilder builder = HttpClientBuilder.create();
         if (retryHandler != null) {
             builder.setRetryHandler(retryHandler);
         } else if (!automaticRetries) {
             builder.disableAutomaticRetries();
         }
-        builder.setDefaultRequestConfig(
-                RequestConfig.custom().setSocketTimeout(socketTimeout).setConnectTimeout(connectTimeout).build());
-        if (proxy == null || proxy.type() == Proxy.Type.DIRECT) {
+        final RequestConfig requestConfig = RequestConfig.custom()
+                .setSocketTimeout(socketTimeout)
+                .setConnectTimeout(connectTimeout)
+                .build();
+        builder.setDefaultRequestConfig(requestConfig);
+        if (sslContext != null) {
             builder.setSSLContext(sslContext);
-        } else {
+        }
+        if (proxy != null && proxy.type() == Type.SOCKS) {
             builder.setSSLSocketFactory(new ProxyConnectionSocketFactory(sslContext, proxy, resolveFromProxy));
             if (resolveFromProxy) {
                 builder.setDnsResolver(new FakeDnsResolver());
             }
         }
+        Arrays.stream(consumers).forEach(c -> c.accept(builder));
         return builder.build();
     }
 
@@ -127,13 +154,13 @@ public final class HttpClientFactory {
 
         ProxyConnectionSocketFactory(final SSLContext sslContext, final Proxy proxy,
                                      final boolean resolveFromProxy) {
-            super(sslContext);
+            super(sslContext != null ? sslContext : SSLContexts.createDefault());
             this.proxy = proxy;
             this.resolveFromProxy = resolveFromProxy;
         }
 
         @Override
-        public Socket createSocket(final HttpContext context) throws IOException {
+        public Socket createSocket(final HttpContext context) {
             return new Socket(proxy);
         }
 

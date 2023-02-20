@@ -13,18 +13,19 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class BasicResponseHandlerFactoryTest {
+class MultiResponseHandlerFactoryTest {
     @Test
     void getResponseHandler() {
-        final ResponseHandlerFactory factory = new BasicResponseHandlerFactory();
+        final ResponseHandlerFactory factory = new MultiResponseHandlerFactory(new BasicResponseHandlerFactory());
         final ResponseHandler<String> handler = factory.getResponseHandler(String.class);
         assertNotNull(handler);
         assertEquals(handler.getClass(), BasicResponseHandler.class);
     }
 
+
     @Test
     void iterator() {
-        final ResponseHandlerFactory factory = new BasicResponseHandlerFactory();
+        final ResponseHandlerFactory factory = new MultiResponseHandlerFactory(new BasicResponseHandlerFactory());
         final Iterator<Class<?>> ite = factory.iterator();
         assertNotNull(ite);
         assertTrue(ite.hasNext());
