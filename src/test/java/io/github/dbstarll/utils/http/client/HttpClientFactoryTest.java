@@ -14,7 +14,9 @@ import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.client.methods.RequestBuilder;
 import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.ssl.SSLContextBuilder;
+import org.apache.http.ssl.SSLContexts;
 import org.apache.http.util.EntityUtils;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x500.X500NameBuilder;
@@ -95,7 +97,8 @@ class HttpClientFactoryTest {
     @Test
     void http() throws Throwable {
         useServer(server -> {
-            try (CloseableHttpClient client = new HttpClientFactory().setAutomaticRetries(false).build()) {
+            try (CloseableHttpClient client = new HttpClientFactory().setAutomaticRetries(false)
+                    .build(HttpClientBuilder::disableAutomaticRetries)) {
                 final HttpUriRequest request = RequestBuilder.get(server.url("/ping.html").uri()).build();
                 try (CloseableHttpResponse response = client.execute(request)) {
                     assertEquals("ok", EntityUtils.toString(response.getEntity()));
@@ -138,6 +141,18 @@ class HttpClientFactoryTest {
     void proxy() throws Throwable {
         try (CloseableHttpClient client = new HttpClientFactory().setSocketTimeout(5000).setConnectTimeout(5000)
                 .setProxy(HttpClientFactory.proxy(Type.SOCKS, "146.56.178.210", 12337)).build()) {
+            final HttpUriRequest request = RequestBuilder.get("https://static.y1cloud.com/ping.html").build();
+            try (CloseableHttpResponse response = client.execute(request)) {
+                assertEquals("ok\n", EntityUtils.toString(response.getEntity()));
+            }
+        }
+    }
+
+    @Test
+    void proxyWithContext() throws Throwable {
+        try (CloseableHttpClient client = new HttpClientFactory().setSocketTimeout(5000).setConnectTimeout(5000)
+                .setProxy(HttpClientFactory.proxy(Type.SOCKS, "146.56.178.210", 12337))
+                .setSslContext(SSLContexts.createDefault()).build()) {
             final HttpUriRequest request = RequestBuilder.get("https://static.y1cloud.com/ping.html").build();
             try (CloseableHttpResponse response = client.execute(request)) {
                 assertEquals("ok\n", EntityUtils.toString(response.getEntity()));

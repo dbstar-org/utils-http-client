@@ -18,10 +18,12 @@ import java.net.Proxy;
 import java.net.Proxy.Type;
 import java.net.Socket;
 import java.net.UnknownHostException;
+import java.util.Arrays;
+import java.util.function.Consumer;
 
 public final class HttpClientFactory {
     public static final int DEFAULT_TIMEOUT = 2000;
-    private SSLContext sslContext = SSLContexts.createDefault();
+    private SSLContext sslContext;
     private Proxy proxy;
     private boolean resolveFromProxy;
     private int socketTimeout = DEFAULT_TIMEOUT;
@@ -109,25 +111,32 @@ public final class HttpClientFactory {
     /**
      * 构造CloseableHttpClient.
      *
+     * @param consumers 用于对HttpClientBuilder的自定义
      * @return CloseableHttpClient
      */
-    public CloseableHttpClient build() {
+    @SafeVarargs
+    public final CloseableHttpClient build(final Consumer<HttpClientBuilder>... consumers) {
         final HttpClientBuilder builder = HttpClientBuilder.create();
         if (retryHandler != null) {
             builder.setRetryHandler(retryHandler);
         } else if (!automaticRetries) {
             builder.disableAutomaticRetries();
         }
-        builder.setDefaultRequestConfig(
-                RequestConfig.custom().setSocketTimeout(socketTimeout).setConnectTimeout(connectTimeout).build());
-        if (proxy == null || proxy.type() == Proxy.Type.DIRECT) {
+        final RequestConfig requestConfig = RequestConfig.custom()
+                .setSocketTimeout(socketTimeout)
+                .setConnectTimeout(connectTimeout)
+                .build();
+        builder.setDefaultRequestConfig(requestConfig);
+        if (sslContext != null) {
             builder.setSSLContext(sslContext);
-        } else {
+        }
+        if (proxy != null && proxy.type() == Type.SOCKS) {
             builder.setSSLSocketFactory(new ProxyConnectionSocketFactory(sslContext, proxy, resolveFromProxy));
             if (resolveFromProxy) {
                 builder.setDnsResolver(new FakeDnsResolver());
             }
         }
+        Arrays.stream(consumers).forEach(c -> c.accept(builder));
         return builder.build();
     }
 
@@ -145,7 +154,7 @@ public final class HttpClientFactory {
 
         ProxyConnectionSocketFactory(final SSLContext sslContext, final Proxy proxy,
                                      final boolean resolveFromProxy) {
-            super(sslContext);
+            super(sslContext != null ? sslContext : SSLContexts.createDefault());
             this.proxy = proxy;
             this.resolveFromProxy = resolveFromProxy;
         }
