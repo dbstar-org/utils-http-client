@@ -8,6 +8,7 @@ import io.github.dbstarll.utils.lang.security.SecurityFactory;
 import io.github.dbstarll.utils.lang.security.SignatureAlgorithm;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.time.DateUtils;
 import org.apache.http.client.HttpRequestRetryHandler;
 import org.apache.http.client.methods.CloseableHttpResponse;
@@ -29,12 +30,16 @@ import org.bouncycastle.operator.OperatorCreationException;
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.bouncycastle.pkcs.jcajce.JcaPKCS10CertificationRequestBuilder;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.ThrowingConsumer;
 
 import javax.net.ssl.SSLContext;
 import java.math.BigInteger;
+import java.net.Authenticator;
 import java.net.InetSocketAddress;
+import java.net.PasswordAuthentication;
 import java.net.Proxy;
 import java.net.Proxy.Type;
 import java.net.SocketException;
@@ -61,6 +66,57 @@ import static org.junit.jupiter.api.Assertions.assertThrowsExactly;
  * 测试HttpClientFactory
  */
 class HttpClientFactoryTest {
+    private static final String TOKEN_PROXY_AUTH = "PROXY_AUTH";
+
+    private static final String PROXY_HOST = "proxy.y1cloud.com";
+    private static final int PROXY_PORT = 33031;
+
+    @BeforeEach
+    void setUp() {
+        Authenticator.setDefault(getAuthenticator());
+    }
+
+    private Authenticator getAuthenticator() {
+        final String proxyAuth = getProxyAuth();
+        if (StringUtils.isNotBlank(proxyAuth)) {
+            final int split = proxyAuth.indexOf(':');
+            if (split > 0) {
+                final String userName = proxyAuth.substring(0, split);
+                final char[] password = proxyAuth.substring(split + 1).toCharArray();
+                return new Authenticator() {
+                    @Override
+                    protected PasswordAuthentication getPasswordAuthentication() {
+                        return new PasswordAuthentication(userName, password);
+                    }
+                };
+            }
+        }
+        return null;
+    }
+
+    private String getProxyAuth() {
+        final String keyFromProperty = System.getProperty(TOKEN_PROXY_AUTH);
+        if (StringUtils.isNotBlank(keyFromProperty)) {
+            return keyFromProperty;
+        }
+
+        final String opts = System.getenv("MAVEN_OPTS");
+        if (StringUtils.isNotBlank(opts)) {
+            for (String opt : StringUtils.split(opts)) {
+                if (opt.startsWith("-D" + TOKEN_PROXY_AUTH + "=")) {
+                    return opt.substring(3 + TOKEN_PROXY_AUTH.length());
+                }
+            }
+        }
+
+        return null;
+    }
+
+    @AfterEach
+    void tearDown() {
+        Authenticator.setDefault(null);
+    }
+
     @SafeVarargs
     private final void useServer(final ThrowingConsumer<MockWebServer> consumer,
                                  final ThrowingConsumer<MockWebServer>... customizers) throws Throwable {
@@ -76,19 +132,19 @@ class HttpClientFactoryTest {
 
     @Test
     void socks() {
-        final Proxy proxy = HttpClientFactory.proxy(Type.SOCKS, "y1cloud.com", 1080);
+        final Proxy proxy = HttpClientFactory.proxy(Type.SOCKS, PROXY_HOST, PROXY_PORT);
         assertEquals(Type.SOCKS, proxy.type());
         final InetSocketAddress address = assertInstanceOf(InetSocketAddress.class, proxy.address());
-        assertEquals("y1cloud.com", address.getHostName());
-        assertEquals("y1cloud.com", address.getHostString());
-        assertEquals(1080, address.getPort());
+        assertEquals(PROXY_HOST, address.getHostName());
+        assertEquals(PROXY_HOST, address.getHostString());
+        assertEquals(PROXY_PORT, address.getPort());
         assertFalse(address.isUnresolved());
         assertNotNull(address.getAddress());
     }
 
     @Test
     void direct() {
-        final Proxy proxy = HttpClientFactory.proxy(Type.DIRECT, "y1cloud.com", 1080);
+        final Proxy proxy = HttpClientFactory.proxy(Type.DIRECT, PROXY_HOST, PROXY_PORT);
         assertSame(Proxy.NO_PROXY, proxy);
         assertEquals(Type.DIRECT, proxy.type());
         assertNull(proxy.address());
@@ -140,7 +196,7 @@ class HttpClientFactoryTest {
     @Test
     void proxy() throws Throwable {
         try (CloseableHttpClient client = new HttpClientFactory().setSocketTimeout(5000).setConnectTimeout(5000)
-                .setProxy(HttpClientFactory.proxy(Type.SOCKS, "146.56.178.210", 12337)).build()) {
+                .setProxy(HttpClientFactory.proxy(Type.SOCKS, PROXY_HOST, PROXY_PORT)).build()) {
             final HttpUriRequest request = RequestBuilder.get("https://static.y1cloud.com/ping.html").build();
             try (CloseableHttpResponse response = client.execute(request)) {
                 assertEquals("ok\n", EntityUtils.toString(response.getEntity()));
@@ -151,7 +207,7 @@ class HttpClientFactoryTest {
     @Test
     void proxyWithContext() throws Throwable {
         try (CloseableHttpClient client = new HttpClientFactory().setSocketTimeout(5000).setConnectTimeout(5000)
-                .setProxy(HttpClientFactory.proxy(Type.SOCKS, "146.56.178.210", 12337))
+                .setProxy(HttpClientFactory.proxy(Type.SOCKS, PROXY_HOST, PROXY_PORT))
                 .setSslContext(SSLContexts.createDefault()).build()) {
             final HttpUriRequest request = RequestBuilder.get("https://static.y1cloud.com/ping.html").build();
             try (CloseableHttpResponse response = client.execute(request)) {
@@ -163,7 +219,7 @@ class HttpClientFactoryTest {
     @Test
     void proxyDirect() throws Throwable {
         try (CloseableHttpClient client = new HttpClientFactory()
-                .setProxy(HttpClientFactory.proxy(Type.DIRECT, "146.56.178.210", 12337)).build()) {
+                .setProxy(HttpClientFactory.proxy(Type.DIRECT, PROXY_HOST, PROXY_PORT)).build()) {
             final HttpUriRequest request = RequestBuilder.get("https://static.y1cloud.com/ping.html").build();
             try (CloseableHttpResponse response = client.execute(request)) {
                 assertEquals("ok\n", EntityUtils.toString(response.getEntity()));
@@ -174,7 +230,7 @@ class HttpClientFactoryTest {
     @Test
     void resolveFromProxy() throws Throwable {
         try (CloseableHttpClient client = new HttpClientFactory().setSocketTimeout(5000).setConnectTimeout(5000)
-                .setProxy(HttpClientFactory.proxy(Type.SOCKS, "146.56.178.210", 12337))
+                .setProxy(HttpClientFactory.proxy(Type.SOCKS, PROXY_HOST, PROXY_PORT))
                 .setResolveFromProxy(true).build()) {
             final HttpUriRequest request = RequestBuilder.get("https://static.y1cloud.com/ping.html").build();
             try (CloseableHttpResponse response = client.execute(request)) {
@@ -192,7 +248,7 @@ class HttpClientFactoryTest {
         };
         try (CloseableHttpClient client = new HttpClientFactory()
                 .setRetryHandler(retryHandler)
-                .setProxy(HttpClientFactory.proxy(Type.SOCKS, "y1cloud.com", 1080))
+                .setProxy(HttpClientFactory.proxy(Type.SOCKS, PROXY_HOST, 1080))
                 .build()) {
             final HttpUriRequest request = RequestBuilder.get("https://static.y1cloud.com/ping.html").build();
             final Exception e = assertThrowsExactly(SocketException.class, () -> client.execute(request));
