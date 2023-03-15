@@ -10,15 +10,18 @@ import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.time.DateUtils;
-import org.apache.http.client.HttpRequestRetryHandler;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpUriRequest;
-import org.apache.http.client.methods.RequestBuilder;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClientBuilder;
-import org.apache.http.ssl.SSLContextBuilder;
-import org.apache.http.ssl.SSLContexts;
-import org.apache.http.util.EntityUtils;
+import org.apache.hc.client5.http.HttpRequestRetryStrategy;
+import org.apache.hc.client5.http.impl.DefaultHttpRequestRetryStrategy;
+import org.apache.hc.client5.http.impl.classic.BasicHttpClientResponseHandler;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
+import org.apache.hc.core5.http.ClassicHttpRequest;
+import org.apache.hc.core5.http.HttpRequest;
+import org.apache.hc.core5.http.io.support.ClassicRequestBuilder;
+import org.apache.hc.core5.http.protocol.HttpContext;
+import org.apache.hc.core5.ssl.SSLContextBuilder;
+import org.apache.hc.core5.ssl.SSLContexts;
+import org.apache.hc.core5.util.TimeValue;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x500.X500NameBuilder;
 import org.bouncycastle.asn1.x500.style.BCStyle;
@@ -36,6 +39,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.ThrowingConsumer;
 
 import javax.net.ssl.SSLContext;
+import java.io.IOException;
 import java.math.BigInteger;
 import java.net.Authenticator;
 import java.net.InetSocketAddress;
@@ -155,10 +159,8 @@ class HttpClientFactoryTest {
         useServer(server -> {
             try (CloseableHttpClient client = new HttpClientFactory().setAutomaticRetries(false)
                     .build(HttpClientBuilder::disableAutomaticRetries)) {
-                final HttpUriRequest request = RequestBuilder.get(server.url("/ping.html").uri()).build();
-                try (CloseableHttpResponse response = client.execute(request)) {
-                    assertEquals("ok", EntityUtils.toString(response.getEntity()));
-                }
+                final ClassicHttpRequest request = ClassicRequestBuilder.get(server.url("/ping.html").uri()).build();
+                assertEquals("ok", client.execute(request, new BasicHttpClientResponseHandler()));
             }
         });
     }
@@ -181,10 +183,8 @@ class HttpClientFactoryTest {
             final SSLContext sslContext = SSLContextBuilder.create().loadTrustMaterial(keyStore, null)
                     .setSecureRandom(random).build();
             try (CloseableHttpClient client = new HttpClientFactory().setSslContext(sslContext).build()) {
-                final HttpUriRequest request = RequestBuilder.get(server.url("/ping.html").uri()).build();
-                try (CloseableHttpResponse response = client.execute(request)) {
-                    assertEquals("ok", EntityUtils.toString(response.getEntity()));
-                }
+                final ClassicHttpRequest request = ClassicRequestBuilder.get(server.url("/ping.html").uri()).build();
+                assertEquals("ok", client.execute(request, new BasicHttpClientResponseHandler()));
             }
         }, s -> {
             final SSLContext sslContext = SSLContextBuilder.create().loadKeyMaterial(keyStore, password)
@@ -197,10 +197,8 @@ class HttpClientFactoryTest {
     void proxy() throws Throwable {
         try (CloseableHttpClient client = new HttpClientFactory().setSocketTimeout(5000).setConnectTimeout(5000)
                 .setProxy(HttpClientFactory.proxy(Type.SOCKS, PROXY_HOST, PROXY_PORT)).build()) {
-            final HttpUriRequest request = RequestBuilder.get("https://static.y1cloud.com/ping.html").build();
-            try (CloseableHttpResponse response = client.execute(request)) {
-                assertEquals("ok\n", EntityUtils.toString(response.getEntity()));
-            }
+            final ClassicHttpRequest request = ClassicRequestBuilder.get("https://static.y1cloud.com/ping.html").build();
+            assertEquals("ok\n", client.execute(request, new BasicHttpClientResponseHandler()));
         }
     }
 
@@ -209,10 +207,8 @@ class HttpClientFactoryTest {
         try (CloseableHttpClient client = new HttpClientFactory().setSocketTimeout(5000).setConnectTimeout(5000)
                 .setProxy(HttpClientFactory.proxy(Type.SOCKS, PROXY_HOST, PROXY_PORT))
                 .setSslContext(SSLContexts.createDefault()).build()) {
-            final HttpUriRequest request = RequestBuilder.get("https://static.y1cloud.com/ping.html").build();
-            try (CloseableHttpResponse response = client.execute(request)) {
-                assertEquals("ok\n", EntityUtils.toString(response.getEntity()));
-            }
+            final ClassicHttpRequest request = ClassicRequestBuilder.get("https://static.y1cloud.com/ping.html").build();
+            assertEquals("ok\n", client.execute(request, new BasicHttpClientResponseHandler()));
         }
     }
 
@@ -220,10 +216,8 @@ class HttpClientFactoryTest {
     void proxyDirect() throws Throwable {
         try (CloseableHttpClient client = new HttpClientFactory()
                 .setProxy(HttpClientFactory.proxy(Type.DIRECT, PROXY_HOST, PROXY_PORT)).build()) {
-            final HttpUriRequest request = RequestBuilder.get("https://static.y1cloud.com/ping.html").build();
-            try (CloseableHttpResponse response = client.execute(request)) {
-                assertEquals("ok\n", EntityUtils.toString(response.getEntity()));
-            }
+            final ClassicHttpRequest request = ClassicRequestBuilder.get("https://static.y1cloud.com/ping.html").build();
+            assertEquals("ok\n", client.execute(request, new BasicHttpClientResponseHandler()));
         }
     }
 
@@ -232,28 +226,29 @@ class HttpClientFactoryTest {
         try (CloseableHttpClient client = new HttpClientFactory().setSocketTimeout(5000).setConnectTimeout(5000)
                 .setProxy(HttpClientFactory.proxy(Type.SOCKS, PROXY_HOST, PROXY_PORT))
                 .setResolveFromProxy(true).build()) {
-            final HttpUriRequest request = RequestBuilder.get("https://static.y1cloud.com/ping.html").build();
-            try (CloseableHttpResponse response = client.execute(request)) {
-                assertEquals("ok\n", EntityUtils.toString(response.getEntity()));
-            }
+            final ClassicHttpRequest request = ClassicRequestBuilder.get("https://static.y1cloud.com/ping.html").build();
+            assertEquals("ok\n", client.execute(request, new BasicHttpClientResponseHandler()));
         }
     }
 
     @Test
     void retry() throws Throwable {
         final AtomicInteger retry = new AtomicInteger();
-        final HttpRequestRetryHandler retryHandler = (exception, executionCount, context) -> {
-            retry.incrementAndGet();
-            return executionCount < 3;
+        final HttpRequestRetryStrategy retryHandler = new DefaultHttpRequestRetryStrategy(3, TimeValue.ofSeconds(1L)) {
+            @Override
+            public boolean retryRequest(HttpRequest request, IOException exception, int execCount, HttpContext context) {
+                retry.incrementAndGet();
+                return super.retryRequest(request, exception, execCount, context);
+            }
         };
         try (CloseableHttpClient client = new HttpClientFactory()
-                .setRetryHandler(retryHandler)
+                .setRetryStrategy(retryHandler)
                 .setProxy(HttpClientFactory.proxy(Type.SOCKS, PROXY_HOST, 1080))
                 .build()) {
-            final HttpUriRequest request = RequestBuilder.get("https://static.y1cloud.com/ping.html").build();
-            final Exception e = assertThrowsExactly(SocketException.class, () -> client.execute(request));
+            final ClassicHttpRequest request = ClassicRequestBuilder.get("https://static.y1cloud.com/ping.html").build();
+            final Exception e = assertThrowsExactly(SocketException.class, () -> client.execute(request, new BasicHttpClientResponseHandler()));
             assertEquals("connect timed out", e.getMessage());
-            assertEquals(3, retry.get());
+            assertEquals(4, retry.get());
         }
     }
 

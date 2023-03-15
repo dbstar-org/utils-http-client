@@ -1,7 +1,7 @@
 package io.github.dbstarll.utils.http.client.response;
 
-import org.apache.http.client.ResponseHandler;
-import org.apache.http.impl.client.BasicResponseHandler;
+import org.apache.hc.client5.http.impl.classic.BasicHttpClientResponseHandler;
+import org.apache.hc.core5.http.io.HttpClientResponseHandler;
 import org.junit.jupiter.api.Test;
 
 import java.util.Iterator;
@@ -17,9 +17,9 @@ class BasicResponseHandlerFactoryTest {
     @Test
     void getResponseHandler() {
         final ResponseHandlerFactory factory = new BasicResponseHandlerFactory();
-        final ResponseHandler<String> handler = factory.getResponseHandler(String.class);
+        final HttpClientResponseHandler<String> handler = factory.getResponseHandler(String.class);
         assertNotNull(handler);
-        assertEquals(handler.getClass(), BasicResponseHandler.class);
+        assertEquals(handler.getClass(), BasicHttpClientResponseHandler.class);
     }
 
     @Test

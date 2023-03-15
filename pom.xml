@@ -23,29 +23,23 @@
   <properties>
     <project.git.project>utils-http-client</project.git.project>
     <!-- module version -->
-    <version.httpcomponents>4.5.14</version.httpcomponents>
+    <version.httpcomponents.client5>5.2.1</version.httpcomponents.client5>
   </properties>
 
   <dependencyManagement>
     <dependencies>
       <dependency>
-        <groupId>org.apache.httpcomponents</groupId>
-        <artifactId>httpmime</artifactId>
-        <version>${version.httpcomponents}</version>
-        <exclusions>
-          <exclusion>
-            <groupId>commons-logging</groupId>
-            <artifactId>commons-logging</artifactId>
-          </exclusion>
-        </exclusions>
+        <groupId>org.apache.httpcomponents.client5</groupId>
+        <artifactId>httpclient5-fluent</artifactId>
+        <version>${version.httpcomponents.client5}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
 
   <dependencies>
     <dependency>
-      <groupId>org.apache.httpcomponents</groupId>
-      <artifactId>httpmime</artifactId>
+      <groupId>org.apache.httpcomponents.client5</groupId>
+      <artifactId>httpclient5-fluent</artifactId>
     </dependency>
   </dependencies>
 
