@@ -1,14 +1,19 @@
 package io.github.dbstarll.utils.http.client;
 
-import org.apache.http.HttpHost;
-import org.apache.http.client.HttpRequestRetryHandler;
-import org.apache.http.client.config.RequestConfig;
-import org.apache.http.conn.DnsResolver;
-import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClientBuilder;
-import org.apache.http.protocol.HttpContext;
-import org.apache.http.ssl.SSLContexts;
+import org.apache.hc.client5.http.HttpRequestRetryStrategy;
+import org.apache.hc.client5.http.SystemDefaultDnsResolver;
+import org.apache.hc.client5.http.config.ConnectionConfig;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
+import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
+import org.apache.hc.client5.http.io.HttpClientConnectionManager;
+import org.apache.hc.client5.http.ssl.SSLConnectionSocketFactory;
+import org.apache.hc.client5.http.ssl.SSLConnectionSocketFactoryBuilder;
+import org.apache.hc.core5.http.HttpHost;
+import org.apache.hc.core5.http.protocol.HttpContext;
+import org.apache.hc.core5.ssl.SSLContexts;
+import org.apache.hc.core5.util.Timeout;
 
 import javax.net.ssl.SSLContext;
 import java.io.IOException;
@@ -22,14 +27,14 @@ import java.util.Arrays;
 import java.util.function.Consumer;
 
 public final class HttpClientFactory {
-    public static final int DEFAULT_TIMEOUT = 2000;
+    public static final Timeout DEFAULT_TIMEOUT = Timeout.ofSeconds(2);
     private SSLContext sslContext;
     private Proxy proxy;
     private boolean resolveFromProxy;
-    private int socketTimeout = DEFAULT_TIMEOUT;
-    private int connectTimeout = DEFAULT_TIMEOUT;
+    private Timeout socketTimeout = DEFAULT_TIMEOUT;
+    private Timeout connectTimeout = DEFAULT_TIMEOUT;
     private boolean automaticRetries = true;
-    private HttpRequestRetryHandler retryHandler;
+    private HttpRequestRetryStrategy retryStrategy;
 
     /**
      * Assigns {@link SSLContext} instance.
@@ -71,7 +76,7 @@ public final class HttpClientFactory {
      * @return this HttpClientFactory
      */
     public HttpClientFactory setSocketTimeout(final int newSocketTimeout) {
-        this.socketTimeout = newSocketTimeout;
+        this.socketTimeout = Timeout.ofMilliseconds(newSocketTimeout);
         return this;
     }
 
@@ -82,7 +87,7 @@ public final class HttpClientFactory {
      * @return this HttpClientFactory
      */
     public HttpClientFactory setConnectTimeout(final int newConnectTimeout) {
-        this.connectTimeout = newConnectTimeout;
+        this.connectTimeout = Timeout.ofMilliseconds(newConnectTimeout);
         return this;
     }
 
@@ -100,11 +105,11 @@ public final class HttpClientFactory {
     /**
      * 设置重试处理器，若不为null，则忽略automaticRetries配置.
      *
-     * @param newRetryHandler 重试处理器
+     * @param newRetryStrategy 重试处理器
      * @return this HttpClientFactory
      */
-    public HttpClientFactory setRetryHandler(final HttpRequestRetryHandler newRetryHandler) {
-        this.retryHandler = newRetryHandler;
+    public HttpClientFactory setRetryStrategy(final HttpRequestRetryStrategy newRetryStrategy) {
+        this.retryStrategy = newRetryStrategy;
         return this;
     }
 
@@ -116,19 +121,26 @@ public final class HttpClientFactory {
      */
     @SafeVarargs
     public final CloseableHttpClient build(final Consumer<HttpClientBuilder>... consumers) {
-        final HttpClientBuilder builder = HttpClientBuilder.create();
-        if (retryHandler != null) {
-            builder.setRetryHandler(retryHandler);
+        final HttpClientBuilder builder = HttpClients.custom().setConnectionManager(buildConnectionManager());
+        if (retryStrategy != null) {
+            builder.setRetryStrategy(retryStrategy);
         } else if (!automaticRetries) {
             builder.disableAutomaticRetries();
         }
-        final RequestConfig requestConfig = RequestConfig.custom()
-                .setSocketTimeout(socketTimeout)
-                .setConnectTimeout(connectTimeout)
-                .build();
-        builder.setDefaultRequestConfig(requestConfig);
+        Arrays.stream(consumers).forEach(c -> c.accept(builder));
+        return builder.build();
+    }
+
+    private HttpClientConnectionManager buildConnectionManager() {
+        final PoolingHttpClientConnectionManagerBuilder builder = PoolingHttpClientConnectionManagerBuilder.create()
+                .setDefaultConnectionConfig(ConnectionConfig.custom()
+                        .setSocketTimeout(socketTimeout)
+                        .setConnectTimeout(connectTimeout)
+                        .build());
         if (sslContext != null) {
-            builder.setSSLContext(sslContext);
+            builder.setSSLSocketFactory(SSLConnectionSocketFactoryBuilder.create()
+                    .setSslContext(sslContext)
+                    .build());
         }
         if (proxy != null && proxy.type() == Type.SOCKS) {
             builder.setSSLSocketFactory(new ProxyConnectionSocketFactory(sslContext, proxy, resolveFromProxy));
@@ -136,11 +148,10 @@ public final class HttpClientFactory {
                 builder.setDnsResolver(new FakeDnsResolver());
             }
         }
-        Arrays.stream(consumers).forEach(c -> c.accept(builder));
         return builder.build();
     }
 
-    private static class FakeDnsResolver implements DnsResolver {
+    private static class FakeDnsResolver extends SystemDefaultDnsResolver {
         @Override
         public InetAddress[] resolve(final String host) throws UnknownHostException {
             // Return some fake DNS record for every request, we won't be using it
@@ -164,19 +175,17 @@ public final class HttpClientFactory {
             return new Socket(proxy);
         }
 
+
         @Override
-        public Socket connectSocket(final int connectTimeout,
-                                    final Socket socket,
-                                    final HttpHost host,
-                                    final InetSocketAddress remoteAddress,
-                                    final InetSocketAddress localAddress,
-                                    final HttpContext context) throws IOException {
+        public Socket connectSocket(final Socket socket, final HttpHost host, final InetSocketAddress remoteAddress,
+                                    final InetSocketAddress localAddress, final Timeout connectTimeout,
+                                    final Object attachment, final HttpContext ctx) throws IOException {
             if (resolveFromProxy) {
-                final InetSocketAddress unresolvedRemote = InetSocketAddress.createUnresolved(host.getHostName(),
+                final InetSocketAddress unresolved = InetSocketAddress.createUnresolved(host.getHostName(),
                         remoteAddress.getPort());
-                return super.connectSocket(connectTimeout, socket, host, unresolvedRemote, localAddress, context);
+                return super.connectSocket(socket, host, unresolved, localAddress, connectTimeout, attachment, ctx);
             } else {
-                return super.connectSocket(connectTimeout, socket, host, remoteAddress, localAddress, context);
+                return super.connectSocket(socket, host, remoteAddress, localAddress, connectTimeout, attachment, ctx);
             }
         }
     }

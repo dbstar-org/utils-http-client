@@ -1,6 +1,6 @@
 package io.github.dbstarll.utils.http.client.response;
 
-import org.apache.http.client.ResponseHandler;
+import org.apache.hc.core5.http.io.HttpClientResponseHandler;
 
 public interface ResponseHandlerFactory extends Iterable<Class<?>> {
     /**
@@ -10,5 +10,5 @@ public interface ResponseHandlerFactory extends Iterable<Class<?>> {
      * @param <T>           response类型
      * @return ResponseHandler
      */
-    <T> ResponseHandler<T> getResponseHandler(Class<T> responseClass);
+    <T> HttpClientResponseHandler<T> getResponseHandler(Class<T> responseClass);
 }
