@@ -11,7 +11,6 @@ import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.hc.client5.http.ssl.SSLConnectionSocketFactory;
 import org.apache.hc.client5.http.ssl.SSLConnectionSocketFactoryBuilder;
 import org.apache.hc.core5.http.HttpHost;
-import org.apache.hc.core5.http.io.SocketConfig;
 import org.apache.hc.core5.http.protocol.HttpContext;
 import org.apache.hc.core5.ssl.SSLContexts;
 import org.apache.hc.core5.util.Timeout;
@@ -134,9 +133,6 @@ public final class HttpClientFactory {
 
     private HttpClientConnectionManager buildConnectionManager() {
         final PoolingHttpClientConnectionManagerBuilder builder = PoolingHttpClientConnectionManagerBuilder.create()
-                .setDefaultSocketConfig(SocketConfig.custom()
-                        .setSoTimeout(socketTimeout)
-                        .build())
                 .setDefaultConnectionConfig(ConnectionConfig.custom()
                         .setSocketTimeout(socketTimeout)
                         .setConnectTimeout(connectTimeout)
