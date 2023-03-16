@@ -1,17 +1,24 @@
 package io.github.dbstarll.utils.http.client;
 
 import org.apache.hc.client5.http.HttpRequestRetryStrategy;
-import org.apache.hc.client5.http.SystemDefaultDnsResolver;
 import org.apache.hc.client5.http.config.ConnectionConfig;
+import org.apache.hc.client5.http.impl.InMemoryDnsResolver;
+import org.apache.hc.client5.http.impl.async.CloseableHttpAsyncClient;
+import org.apache.hc.client5.http.impl.async.HttpAsyncClientBuilder;
+import org.apache.hc.client5.http.impl.async.HttpAsyncClients;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
+import org.apache.hc.client5.http.impl.nio.PoolingAsyncClientConnectionManagerBuilder;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
+import org.apache.hc.client5.http.nio.AsyncClientConnectionManager;
+import org.apache.hc.client5.http.ssl.ClientTlsStrategyBuilder;
 import org.apache.hc.client5.http.ssl.SSLConnectionSocketFactory;
 import org.apache.hc.client5.http.ssl.SSLConnectionSocketFactoryBuilder;
 import org.apache.hc.core5.http.HttpHost;
 import org.apache.hc.core5.http.protocol.HttpContext;
+import org.apache.hc.core5.reactor.IOReactorConfig;
 import org.apache.hc.core5.ssl.SSLContexts;
 import org.apache.hc.core5.util.Timeout;
 
@@ -133,14 +140,9 @@ public final class HttpClientFactory {
 
     private HttpClientConnectionManager buildConnectionManager() {
         final PoolingHttpClientConnectionManagerBuilder builder = PoolingHttpClientConnectionManagerBuilder.create()
-                .setDefaultConnectionConfig(ConnectionConfig.custom()
-                        .setSocketTimeout(socketTimeout)
-                        .setConnectTimeout(connectTimeout)
-                        .build());
+                .setDefaultConnectionConfig(buildConnectionConfig());
         if (sslContext != null) {
-            builder.setSSLSocketFactory(SSLConnectionSocketFactoryBuilder.create()
-                    .setSslContext(sslContext)
-                    .build());
+            builder.setSSLSocketFactory(SSLConnectionSocketFactoryBuilder.create().setSslContext(sslContext).build());
         }
         if (proxy != null && proxy.type() == Type.SOCKS) {
             builder.setSSLSocketFactory(new ProxyConnectionSocketFactory(sslContext, proxy, resolveFromProxy));
@@ -151,7 +153,51 @@ public final class HttpClientFactory {
         return builder.build();
     }
 
-    private static class FakeDnsResolver extends SystemDefaultDnsResolver {
+    /**
+     * 构造CloseableHttpAsyncClient.
+     *
+     * @param consumers 用于对HttpAsyncClientBuilder的自定义
+     * @return CloseableHttpAsyncClient
+     */
+    @SafeVarargs
+    public final CloseableHttpAsyncClient buildAsync(final Consumer<HttpAsyncClientBuilder>... consumers) {
+        final HttpAsyncClientBuilder builder = HttpAsyncClients.custom()
+                .setConnectionManager(buildConnectionManagerAsync())
+                .setIOReactorConfig(buildIOReactorConfig());
+        if (retryStrategy != null) {
+            builder.setRetryStrategy(retryStrategy);
+        } else if (!automaticRetries) {
+            builder.disableAutomaticRetries();
+        }
+        Arrays.stream(consumers).forEach(c -> c.accept(builder));
+        return builder.build();
+    }
+
+    private AsyncClientConnectionManager buildConnectionManagerAsync() {
+        final PoolingAsyncClientConnectionManagerBuilder builder = PoolingAsyncClientConnectionManagerBuilder.create()
+                .setDefaultConnectionConfig(buildConnectionConfig());
+        if (sslContext != null) {
+            builder.setTlsStrategy(ClientTlsStrategyBuilder.create().setSslContext(sslContext).build());
+        }
+        if (proxy != null && proxy.type() == Type.SOCKS && resolveFromProxy) {
+            builder.setDnsResolver(new FakeDnsResolver());
+        }
+        return builder.build();
+    }
+
+    private ConnectionConfig buildConnectionConfig() {
+        return ConnectionConfig.custom().setSocketTimeout(socketTimeout).setConnectTimeout(connectTimeout).build();
+    }
+
+    private IOReactorConfig buildIOReactorConfig() {
+        final IOReactorConfig.Builder builder = IOReactorConfig.custom().setSoTimeout(socketTimeout);
+        if (proxy != null && proxy.type() == Type.SOCKS) {
+            builder.setSocksProxyAddress(proxy.address());
+        }
+        return builder.build();
+    }
+
+    private static class FakeDnsResolver extends InMemoryDnsResolver {
         @Override
         public InetAddress[] resolve(final String host) throws UnknownHostException {
             // Return some fake DNS record for every request, we won't be using it
@@ -163,8 +209,7 @@ public final class HttpClientFactory {
         private final Proxy proxy;
         private final boolean resolveFromProxy;
 
-        ProxyConnectionSocketFactory(final SSLContext sslContext, final Proxy proxy,
-                                     final boolean resolveFromProxy) {
+        ProxyConnectionSocketFactory(final SSLContext sslContext, final Proxy proxy, final boolean resolveFromProxy) {
             super(sslContext != null ? sslContext : SSLContexts.createDefault());
             this.proxy = proxy;
             this.resolveFromProxy = resolveFromProxy;
@@ -174,7 +219,6 @@ public final class HttpClientFactory {
         public Socket createSocket(final HttpContext context) {
             return new Socket(proxy);
         }
-
 
         @Override
         public Socket connectSocket(final Socket socket, final HttpHost host, final InetSocketAddress remoteAddress,

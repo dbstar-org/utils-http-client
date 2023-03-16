@@ -11,7 +11,12 @@ import okhttp3.mockwebserver.MockWebServer;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.time.DateUtils;
 import org.apache.hc.client5.http.HttpRequestRetryStrategy;
+import org.apache.hc.client5.http.async.methods.SimpleHttpRequest;
+import org.apache.hc.client5.http.async.methods.SimpleHttpResponse;
+import org.apache.hc.client5.http.async.methods.SimpleRequestBuilder;
 import org.apache.hc.client5.http.impl.DefaultHttpRequestRetryStrategy;
+import org.apache.hc.client5.http.impl.async.CloseableHttpAsyncClient;
+import org.apache.hc.client5.http.impl.async.HttpAsyncClientBuilder;
 import org.apache.hc.client5.http.impl.classic.BasicHttpClientResponseHandler;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
@@ -56,6 +61,7 @@ import java.security.SecureRandom;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.Date;
+import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -75,6 +81,9 @@ class HttpClientFactoryTest {
     private static final String PROXY_HOST = "proxy.y1cloud.com";
     private static final int PROXY_PORT = 33031;
 
+    private String proxyUsername;
+    private String proxyPassword;
+
     @BeforeEach
     void setUp() {
         Authenticator.setDefault(getAuthenticator());
@@ -85,12 +94,12 @@ class HttpClientFactoryTest {
         if (StringUtils.isNotBlank(proxyAuth)) {
             final int split = proxyAuth.indexOf(':');
             if (split > 0) {
-                final String userName = proxyAuth.substring(0, split);
-                final char[] password = proxyAuth.substring(split + 1).toCharArray();
+                proxyUsername = proxyAuth.substring(0, split);
+                proxyPassword = proxyAuth.substring(split + 1);
                 return new Authenticator() {
                     @Override
                     protected PasswordAuthentication getPasswordAuthentication() {
-                        return new PasswordAuthentication(userName, password);
+                        return new PasswordAuthentication(proxyUsername, proxyPassword.toCharArray());
                     }
                 };
             }
@@ -166,6 +175,19 @@ class HttpClientFactoryTest {
     }
 
     @Test
+    void httpAsync() throws Throwable {
+        useServer(server -> {
+            try (CloseableHttpAsyncClient client = new HttpClientFactory().setAutomaticRetries(false)
+                    .buildAsync(HttpAsyncClientBuilder::disableAutomaticRetries)) {
+                client.start();
+                final SimpleHttpRequest request = SimpleRequestBuilder.get(server.url("/ping.html").uri()).build();
+                final Future<SimpleHttpResponse> future = client.execute(request, null);
+                assertEquals("ok", future.get().getBodyText());
+            }
+        });
+    }
+
+    @Test
     void https() throws Throwable {
         final SecureRandom random = SecurityFactory.builder(SecureRandomAlgorithm.SHA1PRNG).build();
         final KeyPair keyPair = genKeyPair(random);
@@ -194,6 +216,36 @@ class HttpClientFactoryTest {
     }
 
     @Test
+    void httpsAsync() throws Throwable {
+        final SecureRandom random = SecurityFactory.builder(SecureRandomAlgorithm.SHA1PRNG).build();
+        final KeyPair keyPair = genKeyPair(random);
+        final ContentSigner signer = signer(keyPair.getPrivate(), random);
+        final char[] password = "changeit".toCharArray();
+
+        final X500Name subject = new X500NameBuilder().addRDN(BCStyle.CN, "localhost").build();
+        final PKCS10CertificationRequest csr = csr(subject, keyPair.getPublic(), signer);
+        final X509Certificate crt = crt(csr, subject, signer, random);
+
+        final KeyStore keyStore = SecurityFactory.builder(KeyStoreAlgorithm.JKS).load(null, null).build();
+        keyStore.setKeyEntry("localhost", keyPair.getPrivate(), password, new X509Certificate[]{crt});
+
+        useServer(server -> {
+            final SSLContext sslContext = SSLContextBuilder.create().loadTrustMaterial(keyStore, null)
+                    .setSecureRandom(random).build();
+            try (CloseableHttpAsyncClient client = new HttpClientFactory().setSslContext(sslContext).buildAsync()) {
+                client.start();
+                final SimpleHttpRequest request = SimpleRequestBuilder.get(server.url("/ping.html").uri()).build();
+                final Future<SimpleHttpResponse> future = client.execute(request, null);
+                assertEquals("ok", future.get().getBodyText());
+            }
+        }, s -> {
+            final SSLContext sslContext = SSLContextBuilder.create().loadKeyMaterial(keyStore, password)
+                    .setSecureRandom(random).build();
+            s.useHttps(sslContext.getSocketFactory(), false);
+        });
+    }
+
+    @Test
     void proxy() throws Throwable {
         try (CloseableHttpClient client = new HttpClientFactory().setSocketTimeout(5000).setConnectTimeout(5000)
                 .setProxy(HttpClientFactory.proxy(Type.SOCKS, PROXY_HOST, PROXY_PORT)).build()) {
@@ -201,6 +253,18 @@ class HttpClientFactoryTest {
             assertEquals("ok\n", client.execute(request, new BasicHttpClientResponseHandler()));
         }
     }
+
+//    @Test
+//    void proxyAsync() throws Throwable {
+//        try (CloseableHttpAsyncClient client = new HttpClientFactory().setSocketTimeout(5000).setConnectTimeout(5000)
+//                .setProxy(HttpClientFactory.proxy(Type.SOCKS, PROXY_HOST, PROXY_PORT))
+//                .buildAsync()) {
+//            client.start();
+//            final SimpleHttpRequest request = SimpleRequestBuilder.get("https://static.y1cloud.com/ping.html").build();
+//            final Future<SimpleHttpResponse> future = client.execute(request, null);
+//            assertEquals("ok\n", future.get().getBodyText());
+//        }
+//    }
 
     @Test
     void proxyWithContext() throws Throwable {
