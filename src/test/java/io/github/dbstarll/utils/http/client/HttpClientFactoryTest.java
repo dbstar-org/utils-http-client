@@ -10,6 +10,7 @@ import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.time.DateUtils;
+import org.apache.hc.client5.http.ConnectTimeoutException;
 import org.apache.hc.client5.http.HttpRequestRetryStrategy;
 import org.apache.hc.client5.http.async.methods.SimpleHttpRequest;
 import org.apache.hc.client5.http.async.methods.SimpleHttpResponse;
@@ -61,6 +62,7 @@ import java.security.SecureRandom;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.Date;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -286,6 +288,17 @@ class HttpClientFactoryTest {
     }
 
     @Test
+    void proxyDirectAsync() throws Throwable {
+        try (CloseableHttpAsyncClient client = new HttpClientFactory()
+                .setProxy(HttpClientFactory.proxy(Type.DIRECT, PROXY_HOST, PROXY_PORT)).buildAsync()) {
+            client.start();
+            final SimpleHttpRequest request = SimpleRequestBuilder.get("https://static.y1cloud.com/ping.html").build();
+            final Future<SimpleHttpResponse> future = client.execute(request, null);
+            assertEquals("ok\n", future.get().getBodyText());
+        }
+    }
+
+    @Test
     void resolveFromProxy() throws Throwable {
         try (CloseableHttpClient client = new HttpClientFactory().setSocketTimeout(5000).setConnectTimeout(5000)
                 .setProxy(HttpClientFactory.proxy(Type.SOCKS, PROXY_HOST, PROXY_PORT))
@@ -313,6 +326,28 @@ class HttpClientFactoryTest {
             final Exception e = assertThrowsExactly(SocketException.class, () -> client.execute(request, new BasicHttpClientResponseHandler()));
             assertEquals("connect timed out", e.getMessage());
             assertEquals(4, retry.get());
+        }
+    }
+
+    @Test
+    void retryAsync() throws Throwable {
+        final AtomicInteger retry = new AtomicInteger();
+        final HttpRequestRetryStrategy retryHandler = new DefaultHttpRequestRetryStrategy(3, TimeValue.ofSeconds(1L)) {
+            @Override
+            public boolean retryRequest(HttpRequest request, IOException exception, int execCount, HttpContext context) {
+                retry.incrementAndGet();
+                return super.retryRequest(request, exception, execCount, context);
+            }
+        };
+        try (CloseableHttpAsyncClient client = new HttpClientFactory().setRetryStrategy(retryHandler)
+                .setResolveFromProxy(true).setProxy(HttpClientFactory.proxy(Type.SOCKS, PROXY_HOST, 1080))
+                .buildAsync()) {
+            client.start();
+            final SimpleHttpRequest request = SimpleRequestBuilder.get("https://static.y1cloud.com/ping.html").build();
+            final ExecutionException e = assertThrowsExactly(ExecutionException.class, () -> client.execute(request, null).get());
+            assertNotNull(e.getCause());
+            assertSame(ConnectTimeoutException.class, e.getCause().getClass());
+            assertEquals(1, retry.get());
         }
     }
 
