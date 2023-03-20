@@ -10,10 +10,10 @@
   </appender>
 
   <!--定义日志级别-->
-  <root level="debug">
+  <root level="info">
     <appender-ref ref="STDOUT"/>
   </root>
 
   <!--定义自定义package-->
-  <logger name="io.github.dbstarll.utils.http.client" level="trace"/>
+  <logger name="io.github.dbstarll.utils.http.client" level="debug"/>
 </configuration>
