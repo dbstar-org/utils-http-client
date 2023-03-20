@@ -45,6 +45,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.ThrowingConsumer;
 
 import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLHandshakeException;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.net.Authenticator;
@@ -256,17 +257,21 @@ class HttpClientFactoryTest {
         }
     }
 
-//    @Test
-//    void proxyAsync() throws Throwable {
-//        try (CloseableHttpAsyncClient client = new HttpClientFactory().setSocketTimeout(5000).setConnectTimeout(5000)
-//                .setProxy(HttpClientFactory.proxy(Type.SOCKS, PROXY_HOST, PROXY_PORT))
-//                .buildAsync()) {
-//            client.start();
-//            final SimpleHttpRequest request = SimpleRequestBuilder.get("https://static.y1cloud.com/ping.html").build();
-//            final Future<SimpleHttpResponse> future = client.execute(request, null);
+    @Test
+    void proxyAsync() throws Throwable {
+        try (CloseableHttpAsyncClient client = new HttpClientFactory().setSocketTimeout(5000).setConnectTimeout(5000)
+                .setProxy(HttpClientFactory.proxy(Type.SOCKS, PROXY_HOST, PROXY_PORT))
+                .buildAsync()) {
+            client.start();
+            final SimpleHttpRequest request = SimpleRequestBuilder.get("https://static.y1cloud.com/ping.html").build();
+            final Future<SimpleHttpResponse> future = client.execute(request, null);
 //            assertEquals("ok\n", future.get().getBodyText());
-//        }
-//    }
+            // Async模式下的proxy还有问题
+            final ExecutionException e = assertThrowsExactly(ExecutionException.class, future::get);
+            assertNotNull(e.getCause());
+            assertSame(SSLHandshakeException.class, e.getCause().getClass());
+        }
+    }
 
     @Test
     void proxyWithContext() throws Throwable {
