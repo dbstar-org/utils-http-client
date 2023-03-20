@@ -179,9 +179,10 @@ public final class HttpClientFactory {
         if (sslContext != null) {
             builder.setTlsStrategy(ClientTlsStrategyBuilder.create().setSslContext(sslContext).build());
         }
-        if (proxy != null && proxy.type() == Type.SOCKS && resolveFromProxy) {
-            builder.setDnsResolver(new FakeDnsResolver());
-        }
+        // Async的proxy模式暂时无法实现
+//        if (proxy != null && proxy.type() == Type.SOCKS && resolveFromProxy) {
+//            builder.setDnsResolver(new FakeDnsResolver());
+//        }
         return builder.build();
     }
 
