@@ -1,12 +1,12 @@
 package io.github.dbstarll.utils.http.client.response;
 
-import org.apache.hc.client5.http.impl.classic.BasicHttpClientResponseHandler;
-
 public class BasicResponseHandlerFactory extends AbstractResponseHandlerFactory {
     /**
      * 构造BasicResponseHandlerFactory.
+     *
+     * @param alwaysProcessEntity 在返回错误的状态码时，是否还要继续解析entity
      */
-    public BasicResponseHandlerFactory() {
-        addResponseHandler(String.class, new BasicHttpClientResponseHandler());
+    public BasicResponseHandlerFactory(final boolean alwaysProcessEntity) {
+        addResponseHandler(String.class, new StringResponseHandler(alwaysProcessEntity));
     }
 }
