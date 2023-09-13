@@ -27,9 +27,13 @@ class BasicResponseHandlerFactoryTest {
         final Iterator<Class<?>> ite = factory.iterator();
         assertNotNull(ite);
         assertTrue(ite.hasNext());
-        final Class<?> handlerClass = ite.next();
-        assertNotNull(handlerClass);
-        assertEquals(handlerClass, String.class);
+        final Class<?> handlerClass1 = ite.next();
+        assertNotNull(handlerClass1);
+        assertEquals(byte[].class, handlerClass1);
+        assertTrue(ite.hasNext());
+        final Class<?> handlerClass2 = ite.next();
+        assertNotNull(handlerClass2);
+        assertEquals(String.class, handlerClass2);
         assertFalse(ite.hasNext());
         assertThrows(NoSuchElementException.class, ite::next);
     }

@@ -8,5 +8,6 @@ public class BasicResponseHandlerFactory extends AbstractResponseHandlerFactory 
      */
     public BasicResponseHandlerFactory(final boolean alwaysProcessEntity) {
         addResponseHandler(String.class, new StringResponseHandler(alwaysProcessEntity));
+        addResponseHandler(byte[].class, new ByteArrayResponseHandler(alwaysProcessEntity));
     }
 }

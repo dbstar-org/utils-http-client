@@ -1,10 +1,13 @@
 package io.github.dbstarll.utils.http.client.response;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.core5.http.io.HttpClientResponseHandler;
 
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.SortedSet;
+import java.util.TreeSet;
 
 import static org.apache.commons.lang3.Validate.notNull;
 
@@ -30,6 +33,8 @@ public abstract class AbstractResponseHandlerFactory implements ResponseHandlerF
 
     @Override
     public final Iterator<Class<?>> iterator() {
-        return handlers.keySet().iterator();
+        final SortedSet<Class<?>> sorted = new TreeSet<>((c1, c2) -> StringUtils.compare(c1.getName(), c2.getName()));
+        sorted.addAll(handlers.keySet());
+        return sorted.iterator();
     }
 }

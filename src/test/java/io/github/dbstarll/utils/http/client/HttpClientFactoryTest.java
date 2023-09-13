@@ -1,5 +1,6 @@
 package io.github.dbstarll.utils.http.client;
 
+import io.github.dbstarll.utils.lang.enums.EnumUtils;
 import io.github.dbstarll.utils.lang.security.InstanceException;
 import io.github.dbstarll.utils.lang.security.KeyPairGeneratorAlgorithm;
 import io.github.dbstarll.utils.lang.security.KeyStoreAlgorithm;
@@ -192,7 +193,7 @@ class HttpClientFactoryTest {
 
     @Test
     void https() throws Throwable {
-        final SecureRandom random = SecurityFactory.builder(SecureRandomAlgorithm.SHA1PRNG).build();
+        final SecureRandom random = SecurityFactory.builder(SecureRandomAlgorithm.SHA1_PRNG).build();
         final KeyPair keyPair = genKeyPair(random);
         final ContentSigner signer = signer(keyPair.getPrivate(), random);
         final char[] password = "changeit".toCharArray();
@@ -220,7 +221,7 @@ class HttpClientFactoryTest {
 
     @Test
     void httpsAsync() throws Throwable {
-        final SecureRandom random = SecurityFactory.builder(SecureRandomAlgorithm.SHA1PRNG).build();
+        final SecureRandom random = SecurityFactory.builder(SecureRandomAlgorithm.SHA1_PRNG).build();
         final KeyPair keyPair = genKeyPair(random);
         final ContentSigner signer = signer(keyPair.getPrivate(), random);
         final char[] password = "changeit".toCharArray();
@@ -361,7 +362,7 @@ class HttpClientFactoryTest {
     }
 
     private static ContentSigner signer(final PrivateKey privateKey, final SecureRandom random) throws OperatorCreationException {
-        return new JcaContentSignerBuilder(SignatureAlgorithm.SHA256withRSA.name()).setSecureRandom(random).build(privateKey);
+        return new JcaContentSignerBuilder(EnumUtils.name(SignatureAlgorithm.SHA256_WITH_RSA)).setSecureRandom(random).build(privateKey);
     }
 
     private static PKCS10CertificationRequest csr(final X500Name subject, final PublicKey publicKey,
